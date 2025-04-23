@@ -1,0 +1,106 @@
+---
+title: "174 Final Project"
+author: "Yahir B"
+date: "2025-03-19"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 174 Final Project R Code
+
+```{r}
+library(tidymodels)
+library(tidyverse)
+library(ggplot2)
+library(astsa)
+library(tseries)
+library(forecast)
+
+
+
+
+sbux_raw <- read_csv('/Users/yahir/Starbucks_History(3) copy.csv')
+
+
+# Removing rows with NA values
+sbux <- sbux_raw %>% drop_na()  
+
+#formating Date to MM/DD/YYY
+sbux$Date <- as.Date(sbux$Date, format = "%m/%d/%y") 
+
+#Arranging Date from oldest to newest
+sbux <- sbux %>% arrange(Date)
+sbux
+
+sbux_log <- log(sbux$Price) ###
+
+#using ggplot for better interpretation using Months
+ggplot(sbux, aes(x = Date, y = Price)) +
+  geom_line() +
+  ggtitle("Starbucks Stock Price Over Time (Daily)") +
+  theme_minimal() +
+  xlab("Date") + 
+  ylab("Price (USD)") +
+  scale_x_date(labels = scales::date_format("%b %Y"), breaks = "1 month") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+```{r}
+#creating time series and plotting
+sbux_ts <- ts(sbux_log, start = c(year(min(sbux$Date)), month(min(sbux$Date))), frequency = 252)
+
+plot(sbux_ts, main = "Starbucks Stock Price (Time Series)", ylab = "Price (USD)", xlab = "Time", type = "l")
+
+```
+
+```{r}
+#taking first two differences 
+sbux_diff1 <- diff(sbux_log)
+sbux_diff2 <- diff(sbux_diff1)
+
+
+plot(sbux_diff1, type = "l", main = "Fig. 1 - First Differenced Starbucks Price", ylab = "Price Change")
+plot(sbux_diff2, type = "l", main = "Fig. 2 - Second Differenced Starbucks Price", ylab = "Price Change")
+
+
+```
+
+```{r}
+#plotting acf and pacf plots
+acf(sbux_diff2, lag.max = 200)
+pacf(sbux_diff2,lag.max=200)
+```
+
+```{r}
+#fitting SARIMA
+sbux_sarima1 = Arima(sbux_diff1, order=c(1,1,1), seasonal=list(order=c(1,1,0), period=25), method="CSS") 
+
+```
+
+```{r}
+#calculating and plotting residuals 
+residuals <- residuals(sbux_sarima1)
+sigma2<- 0.000745
+std_residuals <- residuals / sqrt(sigma2)
+
+#plotting residual acf
+acf(residuals, main = "Fig. 4 - ACF of Residuals", lag.max = 100)
+
+#plotting standardized residuals
+plot(std_residuals, type = "l", main = "Fig. 3 -Standardized Residuals", xlab = "Time", ylab = "Standardized Residuals")
+
+#qqnorm of standardized residuals
+qqnorm(std_residuals, main = "Fig. 5 -QQ Plot of Standardized Residuals")
+qqline(std_residuals, col = "red")  # Add a reference line
+```
+
+```{r}
+#performing ADF test for stationarity 
+adf.test(residuals)  
+
+
+```
